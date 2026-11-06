@@ -79,7 +79,6 @@ adb install -r build/vscode.apk
 
 Pushing a `v*` tag builds the APK on `ubuntu-24.04-arm` and attaches it to the GitHub Release.
 
-Optionally add a `KEYSTORE_BASE64` secret (base64 of your `vscode.jks`) so every release is signed with the same key — otherwise CI generates a throwaway key and releases cannot be installed over each other.
 
 ## License
 
