@@ -83,8 +83,6 @@ adb install -r build/vscode.apk
 
 打 `v*` tag 会在 `ubuntu-24.04-arm` 上自动构建并把 APK 附到 Release（见 `.github/workflows/release.yml`）。
 
-想让自己发布的每个版本签名一致，在仓库 Secrets 里加一个 `KEYSTORE_BASE64`（你 `vscode.jks` 的 base64）；不加的话 CI 会临时生成一把新密钥，版本之间无法覆盖安装。
-
 ## 许可
 
 代码以 MIT 许可发布，见 [LICENSE](LICENSE)。
