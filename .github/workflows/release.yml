@@ -32,16 +32,25 @@ jobs:
         run: bash scripts/fetch-assets.sh 8
 
       - name: 恢复签名密钥（可选）
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        env:
+          KS: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          mkdir -p build
-          printf '%s' "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > build/vscode.jks
+          if [ -n "$KS" ]; then
+            mkdir -p build
+            printf '%s' "$KS" | base64 -d > build/vscode.jks
+            echo "已使用仓库提供的签名密钥"
+          else
+            echo "未提供 KEYSTORE_BASE64，本次将临时生成签名密钥"
+          fi
 
       - name: 构建 APK
         run: |
           VCODE="${{ github.run_number }}"
-          VNAME="${GITHUB_REF_NAME#v}"
-          [ -z "$VNAME" ] && VNAME="0.0.$VCODE"
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            VNAME="${GITHUB_REF_NAME#v}"
+          else
+            VNAME="0.0.$VCODE"
+          fi
           echo "versionCode=$VCODE versionName=$VNAME"
           VCODE="$VCODE" VNAME="$VNAME" bash build.sh
 
