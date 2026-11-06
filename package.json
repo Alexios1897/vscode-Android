@@ -1,0 +1,15 @@
+{
+  "name": "vscode-android",
+  "version": "2.5.0",
+  "private": true,
+  "description": "Official VS Code packed into an Android APK (proot + Ubuntu rootfs + code serve-web)",
+  "scripts": {
+    "assets": "bash scripts/fetch-assets.sh",
+    "build": "bash build.sh",
+    "icon": "node make-icon.js"
+  },
+  "devDependencies": {
+    "sharp": "^0.34.0"
+  },
+  "license": "MIT"
+}
