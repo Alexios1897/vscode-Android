@@ -1,0 +1,21 @@
+# 下载与构建产物
+dl/
+build/
+node_modules/
+
+# 由 scripts/fetch-assets.sh 生成的大文件
+app/assets/*.tar.gz
+app/assets/*.gz
+app/assets/code
+app/assets/proot
+app/assets/loader
+app/assets/loader32
+app/assets/*.so
+app/assets/*.so.2
+app/assets/ca-certificates.crt
+app/assets/nls.zh-cn.js
+
+# 本机专用（含密钥，绝不提交）
+local/
+*.jks
+*.keystore
