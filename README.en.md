@@ -2,6 +2,15 @@ Official **VS Code** packed into an Android APK — proot + Ubuntu rootfs + `cod
 
 > Unofficial project: it only repacks official components that you download yourself. No Microsoft binaries are distributed in this repository.
 
+## Disclaimer
+
+- This is an **unofficial** project. It is not affiliated with, authorized, sponsored or endorsed by Microsoft Corporation.
+- This repository contains **no Microsoft binaries or source code**. `scripts/fetch-assets.sh` only lets *you* download components from official endpoints.
+- The APK attached to a Release is the author's **personal build**, intended for running on hardware the author owns, and is not offered for redistribution. If you want to use this project, build it yourself with `bash build.sh`.
+- **VS Code**, **Visual Studio Code** and their logos are trademarks of Microsoft Corporation. The icon is derived from the VS Code logo for personal builds only and does not imply endorsement.
+- **proot** is distributed with the APK and comes from Termux under **GPLv2**; source: <https://github.com/termux/proot>.
+- Any compliance responsibility arising from use of this project rests with the user.
+
 ## What it can do
 
 - **Real VS Code**: the official `code serve-web` UI, rendered full-screen in a WebView — not a look-alike editor

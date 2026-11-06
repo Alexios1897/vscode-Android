@@ -6,6 +6,15 @@
 
 > 非官方项目：只是把自己下载的官方组件打包成一个 App，不分发任何微软的二进制。
 
+## 免责声明
+
+- 本项目**非官方**，与 Microsoft Corporation 无任何关联，未获其授权、赞助或背书。
+- 仓库中**不包含**任何微软的二进制或源码；`scripts/fetch-assets.sh` 只是让**使用者自己**从官方地址下载组件。
+- Release 中提供的 APK 是作者的**个人自用构建**，用于在自有设备上运行，不为再分发目的提供；如需使用，建议自行 `bash build.sh` 构建。
+- **VS Code**、**Visual Studio Code** 及其标志是 Microsoft Corporation 的商标。图标取自 VS Code 标志，仅用于个人构建，不代表官方。
+- 随 APK 分发的 **proot** 来自 Termux，采用 **GPLv2** 许可，源码见 <https://github.com/termux/proot>。
+- 使用本项目产生的任何合规责任由使用者自行承担。
+
 ## 它能做什么
 
 - **真正的 VS Code**：官方 `code serve-web` 界面，原生全屏 WebView 呈现，不是仿制的编辑器

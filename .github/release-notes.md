@@ -29,3 +29,7 @@
 ## 源码
 
 见仓库内 `scripts/fetch-assets.sh` 与 `build.sh`。English README: [README.en.md](https://github.com/Alexios1897/vscode-Android/blob/main/README.en.md)
+
+---
+
+**免责声明**：非官方项目，与 Microsoft 无关联。Release 中的 APK 是作者的个人自用构建，不为再分发目的提供；仓库只包含构建脚本，组件由使用者自行从官方地址下载。VS Code 是 Microsoft 的商标；随包分发的 proot 来自 Termux，GPLv2（https://github.com/termux/proot）。使用风险自担。
