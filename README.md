@@ -1,5 +1,7 @@
 # VS Code for Android
 
+[English](README.en.md) | 中文
+
 把**官方 VS Code** 的服务端和一套迷你 Linux 一起打进 APK。安卓平板或手机装上就能用，不需要 Termux，也不需要一台电脑在旁边。
 
 > 非官方项目：只是把自己下载的官方组件打包成一个 App，不分发任何微软的二进制。
@@ -67,6 +69,12 @@ adb install -r build/vscode.apk
 - `targetSdkVersion=28`：这是为了允许在应用私有目录里执行 Linux 程序，安装时系统可能提示「为旧版 Android 构建」
 - 通过 `http://127.0.0.1` 访问，个别依赖 WebCrypto 的扩展能力受限
 - 没有实现自动更新，换 VS Code 版本需要重新构建
+
+## CI
+
+打 `v*` tag 会在 `ubuntu-24.04-arm` 上自动构建并把 APK 附到 Release（见 `.github/workflows/release.yml`）。
+
+想让自己发布的每个版本签名一致，在仓库 Secrets 里加一个 `KEYSTORE_BASE64`（你 `vscode.jks` 的 base64）；不加的话 CI 会临时生成一把新密钥，版本之间无法覆盖安装。
 
 ## 许可
 
