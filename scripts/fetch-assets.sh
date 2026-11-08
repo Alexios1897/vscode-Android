@@ -85,7 +85,8 @@ echo "$COMMIT" > dl/COMMIT
 echo "$BASE" > dl/BASE_URL
 
 # ---------------------------------------------------------------- 运行时
-fetch "$BASE/vscode_cli_linux-arm64_cli.tar.gz" dl/vscode_cli.tar.gz
+# CLI 的文件名官方改过（linux-arm64 → linux_arm64），直接用接口给的 URL 最稳
+fetch "$CLI_URL" dl/vscode_cli.tar.gz
 fetch "$BASE/vscode-server-linux-arm64-web.tar.gz" dl/vscode_server_web.tar.gz
 cp dl/vscode_cli.tar.gz app/assets/code.gz
 tar -xzf dl/vscode_cli.tar.gz -C dl

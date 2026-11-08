@@ -11,12 +11,27 @@ BT=dl/sdktools/build-tools
 rm -rf build/classes build/dex
 mkdir -p build/classes build/dex
 
+echo "== 注入服务端 commit"
+SRC=build/src
+rm -rf "$SRC" && mkdir -p "$SRC" && cp app/src/io/dsh/vscode/*.java "$SRC"/
+if [ -f dl/COMMIT ]; then
+  C="$(tr -d '[:space:]' < dl/COMMIT)"
+  if ! printf '%s' "$C" | grep -qE '^[0-9a-f]{40}$'; then
+    echo "dl/COMMIT 内容不合法: $C" >&2; exit 1
+  fi
+  sed -i -E "s/static final String COMMIT = \"[0-9a-f]{40}\"/static final String COMMIT = \"$C\"/" "$SRC/Boot.java"
+  grep -q "String COMMIT = \"$C\"" "$SRC/Boot.java" || { echo "注入 COMMIT 失败" >&2; exit 1; }
+  echo "   COMMIT=$C"
+else
+  echo "   没有 dl/COMMIT，沿用源码里的值"
+fi
+
 echo "== javac"
 # 以前这里是 `javac ... | grep -v "^Note:" || true`：编译错误连同 pipefail 一起被吞掉，
 # 一路走到 d8/aapt2 才炸，报错还极难懂。这里保留日志并显式失败。
 JAVAC_LOG=build/javac.log
 if ! javac -source 8 -target 8 -nowarn -bootclasspath "$JAR" -classpath "$JAR" \
-     -d build/classes app/src/io/dsh/vscode/*.java >"$JAVAC_LOG" 2>&1; then
+     -d build/classes "$SRC"/*.java >"$JAVAC_LOG" 2>&1; then
   echo "== javac 失败，输出如下：" >&2
   cat "$JAVAC_LOG" >&2
   exit 1
