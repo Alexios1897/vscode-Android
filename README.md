@@ -78,7 +78,15 @@ adb install -r build/vscode.apk
 
 ## 持续集成
 
-`.github/workflows/build.yml` 在 x86_64 runner 上跑同一套脚本（`workflow_dispatch` 或推送 `v*` tag 触发），产物是 `vscode.apk` 构件。下载产物走 actions/cache；`fetch-assets.sh` 每次都会做归档完整性校验，并把 sha256 写进 `dl/SHA256SUMS`。
+两个工作流分工：
+
+| 工作流 | 触发 | 干什么 |
+| --- | --- | --- |
+| `.github/workflows/build.yml` | 手动 / 向 `main` 提 PR | 跑同一套脚本产出 `vscode.apk` 构件，用来验证改动能编过 |
+| `.github/workflows/release.yml` | 推送 `v*` tag | 构建并把 APK 附到 GitHub Release |
+
+两者都在 x86_64 runner 上执行（`fetch-assets.sh` 会按 `uname -m` 自动挑 aapt2/zipalign）。下载缓存走 actions/cache；每次下载都会做归档完整性校验，并把 sha256 记进 `dl/SHA256SUMS`。
+
 
 ## 安装与首次启动
 
@@ -94,10 +102,6 @@ adb install -r build/vscode.apk
 - `targetSdkVersion=28`：这是为了允许在应用私有目录里执行 Linux 程序，安装时系统可能提示「为旧版 Android 构建」
 - 通过 `http://127.0.0.1` 访问，个别依赖 WebCrypto 的扩展能力受限
 - 没有实现自动更新，换 VS Code 版本需要重新构建
-
-## CI
-
-打 `v*` tag 会在 `ubuntu-24.04-arm` 上自动构建并把 APK 附到 Release（见 `.github/workflows/release.yml`）。
 
 ## 许可
 

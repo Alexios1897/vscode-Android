@@ -10,8 +10,8 @@ permissions:
 
 jobs:
   build:
-    # aapt2 用的是 ARM 构建，必须在 aarch64 主机上打
-    runs-on: ubuntu-24.04-arm
+    # fetch-assets.sh 会按 uname -m 选 aapt2/zipalign，x86_64 runner 也能打 arm64 包
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 

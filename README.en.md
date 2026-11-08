@@ -46,6 +46,18 @@ Three directories under `persist/` are bind-mounted into the container:
 | `persist/cli` | `/root/.vscode` | CLI cache, server build |
 | `persist/codex` | `/root/.codex` | optional CLI tool config |
 
+## Security
+
+The server listens on `127.0.0.1`, but Android has **no per-app network isolation** — any other app on the device can reach `127.0.0.1:18080`. Since v2.6 the app no longer uses `--without-connection-token`:
+
+- a 64-hex-char token is generated on first launch and stored in `persist/cli/token` (`/root/.vscode/token` in the container, mode `0600`)
+- the server reads it via `--connection-token-file`; the WebView loads the URL with `?tkn=…`
+- `tkn=` values are redacted before anything is written to the log file
+- long-press the splash screen to see the full URL if you want to open it from another browser
+- delete `persist/cli/token` and restart to rotate it (existing WebView cookies stop working)
+
+Note this does not add transport encryption: the traffic is still plain `http://127.0.0.1`.
+
 ## Requirements
 
 | Item | Requirement |
@@ -62,7 +74,7 @@ Not supported: x86/x86_64 emulators, Windows Subsystem for Android, 32-bit ARM d
 
 ## Build
 
-Requires an **aarch64 Linux** host (the aapt2 we use is an ARM build), **JDK 17** and **Node.js 18+**.
+Requires an **aarch64 or x86_64 Linux** host, **JDK 17** and **Node.js 18+**. `fetch-assets.sh` picks the matching aapt2/zipalign for `uname -m`.
 
 ```bash
 bash scripts/fetch-assets.sh      # downloads VS Code server/CLI, Ubuntu rootfs, proot, arm64 aapt2
