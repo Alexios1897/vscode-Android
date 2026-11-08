@@ -1,6 +1,6 @@
 {
   "name": "vscode-android",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "private": true,
   "description": "Official VS Code packed into an Android APK (proot + Ubuntu rootfs + code serve-web)",
   "scripts": {

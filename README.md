@@ -50,9 +50,20 @@ proot -0 -r rootfs …  code serve-web --host 127.0.0.1 --port 18080
 | `persist/cli` | `/root/.vscode` | CLI 缓存、服务端 |
 | `persist/codex` | `/root/.codex` | Codex/CLI 工具的自定义配置（可选） |
 
+## 安全
+
+服务只监听 `127.0.0.1`，但 Android **没有** per-App 网络隔离——同一台设备上的其它 App 一样能连上 `127.0.0.1:18080`。
+所以 v2.6 起不再用 `--without-connection-token`：
+
+- 首次启动生成 64 个十六进制字符的令牌，落在 `persist/cli/token`（容器内 `/root/.vscode/token`，权限 `0600`）
+- 服务端用 `--connection-token-file` 读它，WebView 加载时自动带上 `?tkn=…`
+- 日志里出现的 `tkn=` 一律打码，令牌不会写进日志文件
+- 想在设备外部（例如桌面浏览器）打开：长按启动界面能看到完整地址；或 `adb shell su -c cat /data/data/io.dsh.vscode/files/persist/cli/token`
+- 删掉 `persist/cli/token` 再启动会重新生成（旧的 WebView cookie 随之失效）
+
 ## 构建
 
-需要一台 **aarch64 Linux**（树莓派、ARM 服务器、或者安卓上的 proot 都行）、**JDK 17**、**Node.js 18+**。
+需要一台 **aarch64 或 x86_64 Linux**（树莓派、ARM/x86 服务器、或者安卓上的 proot 都行）、**JDK 17**、**Node.js 18+**。`fetch-assets.sh` 会按 `uname -m` 自动选对应架构的 aapt2/zipalign。
 
 ```bash
 bash scripts/fetch-assets.sh      # 下载 VS Code 服务端/CLI、Ubuntu rootfs、proot、aarch64 版 aapt2
@@ -65,11 +76,16 @@ adb install -r build/vscode.apk
 想换图标：替换 `icon-src.webp`（正方形图），然后 `node make-icon.js`。
 想换中文文案：把语言包解压到 `dl/language-pack`，重跑 `fetch-assets.sh` 会生成 `app/assets/nls.zh-cn.js`。
 
+## 持续集成
+
+`.github/workflows/build.yml` 在 x86_64 runner 上跑同一套脚本（`workflow_dispatch` 或推送 `v*` tag 触发），产物是 `vscode.apk` 构件。下载产物走 actions/cache；`fetch-assets.sh` 每次都会做归档完整性校验，并把 sha256 写进 `dl/SHA256SUMS`。
+
 ## 安装与首次启动
 
 - 直接安装 APK（需要允许「未知来源」）
-- 首次启动会把约 700MB 解压到应用私有目录，之后启动是秒开
-- 需要约 1.2GB 可用空间
+- 首次启动把约 765MB 解压到应用私有目录（v2.6 起直接从 APK 流式解压，不再额外落一份 tar 副本），之后启动是秒开
+- 建议留出约 1.1GB 可用空间
+- 通知栏有「停止」按钮，用来结束常驻的服务端；停止后重新打开 App 会再次拉起
 
 ## 已知限制
 

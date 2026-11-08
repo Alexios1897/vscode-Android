@@ -14,12 +14,18 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 
 /** 负责：解压资源、启动 proot、拉起 VS Code 服务端、写日志 */
 public final class Boot {
     public static final String TAG = "VSCodeAPK";
     public static final int PORT = 18080;
-    /** 每次改动解压/启动逻辑都要加一，用于判断是否需要重新解压 */
+    /**
+     * 容器内可见的令牌文件路径：persist/cli 绑定到 /root/.vscode，
+     * 因此宿主机上的 persist/cli/token 就是容器里的这个路径。
+     */
+    static final String TOKEN_IN_CONTAINER = "/root/.vscode/token";
+    /** 每次改动解压/启动逻辑都要加一，用于判断是否需要重新解压（只改启动参数不用加） */
     private static final String BUILD = "2.5";
     /** 与 assets/vscode.tar.gz 对应的构建 commit（换包时要一起改） */
     static final String COMMIT = "6bab64e2d12b04d04c0d99c27ff166023efd1dda";
@@ -28,6 +34,8 @@ public final class Boot {
     private static File base;
     private static File logFile;
     private static volatile String state = "idle";
+    /** 本次运行使用的连接令牌，WebView 加载时作为 ?tkn= 参数传过去 */
+    private static volatile String token = "";
 
     private static final String[] TAIL = new String[40];
     private static int tailPos = 0;
@@ -94,6 +102,7 @@ public final class Boot {
             if (old.isDirectory()) log("迁移旧 CLI 缓存: " + old.renameTo(hostCli));
         }
         hostCli.mkdirs();
+        token = loadOrCreateToken(hostCli);
         File hostCodex = new File(persist, "codex");
         hostCodex.mkdirs();
         new File(hostCli, "cli").mkdirs();
@@ -102,26 +111,20 @@ public final class Boot {
         String have = stamp.exists() ? readText(stamp) : "";
 
         if (!want.equals(have)) {
-            log("首次启动：解压 rootfs（105MB）…");
+            log("首次启动：解压 rootfs（约 105MB）…");
             deleteTree(rootfs);
-            File tar = new File(base, "rootfs.tar.gz");
-            copyAsset(ctx, "rootfs.tar.gz", tar);
-            new TarX(LOG).extract(tar, rootfs);
-            tar.delete();
+            extractAsset(ctx, "rootfs.tar.gz", rootfs, new TarX(LOG));
 
-            log("解压 VS Code 服务端（660MB，第一次要几分钟）…");
-            File vtar = new File(base, "vscode.tar.gz");
-            copyAsset(ctx, "vscode.tar.gz", vtar);
+            log("解压 VS Code 服务端（约 660MB，第一次要几分钟）…");
             File srvCache = new File(hostCli, "cli/serve-web/" + COMMIT);
             srvCache.getParentFile().mkdirs();
-            new TarX(LOG, 1).extract(vtar, srvCache);
+            extractAsset(ctx, "vscode.tar.gz", srvCache, new TarX(LOG, 1));
 
             // 官方 CLI：登录态靠它下发的 cookie（vscode-cli-secret-half / vscode-secret-key-path）才能持久化
             File cli = new File(rootfs, "opt/vscode/code");
             new File(rootfs, "opt/vscode").mkdirs();
             copyAsset(ctx, "code", cli);
             chmod(cli, 0755);
-            vtar.delete();
 
             File lib = new File(base, "lib");
             lib.mkdirs();
@@ -196,7 +199,7 @@ public final class Boot {
         File proot = new File(base, "proot");
         String[] cmd = new String[] {
                 proot.getAbsolutePath(),
-                "--link2symlink", "-0",
+                "--link2symlink", "--kill-on-exit", "-0",
                 "-r", rootfs.getAbsolutePath(),
                 "-w", "/root",
                 "-b", "/dev", "-b", "/dev/pts", "-b", "/dev/shm",
@@ -214,7 +217,8 @@ public final class Boot {
                 "NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt",
                 "/opt/vscode/code", "serve-web",
                 "--host", "127.0.0.1", "--port", String.valueOf(PORT),
-                "--without-connection-token",
+                // 不再关掉令牌：没有它，同机任何 App 都能直接接管这个端口
+                "--connection-token-file", TOKEN_IN_CONTAINER,
                 "--accept-server-license-terms",
                 "--disable-telemetry",
                 "--commit-id", COMMIT,
@@ -229,19 +233,21 @@ public final class Boot {
         pb.environment().put("LD_LIBRARY_PATH", new File(base, "lib").getAbsolutePath());
 
         log("启动: " + pb.command().toString());
-        proc = pb.start();
+        final Process p = pb.start();
+        proc = p;
 
-        final BufferedReader r = new BufferedReader(new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8));
+        final BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8));
         Thread pump = new Thread(new Runnable() {
             @Override public void run() {
                 String line;
                 try {
                     while ((line = r.readLine()) != null) {
+                        line = redact(line);
                         lastLines(line);
                         log("[srv] " + line);
                     }
                 } catch (IOException ignored) {}
-                try { int code = proc.waitFor(); log("服务端进程退出 code=" + code); } catch (Exception ignored) {}
+                try { int code = p.waitFor(); log("服务端进程退出 code=" + code); } catch (Exception ignored) {}
             }
         });
         pump.setDaemon(true);
@@ -260,6 +266,68 @@ public final class Boot {
             if (s != null) sb.append(s).append('\n');
         }
         return sb.toString();
+    }
+
+    /** WebView 要加载的地址：必须带 tkn 参数，否则 serve-web 会拒绝 */
+    public static String webUrl() {
+        StringBuilder sb = new StringBuilder("http://127.0.0.1:").append(PORT)
+                .append("/?folder=/root/workspace");
+        String t = token;
+        if (t != null && !t.isEmpty()) sb.append("&tkn=").append(t);
+        return sb.toString();
+    }
+
+    /** 停止服务端进程（通知栏「停止」按钮用）；proot 的 --kill-on-exit 会顺带清掉子进程 */
+    public static synchronized void stop() {
+        Process p = proc;
+        if (p == null) return;
+        proc = null;
+        state = "stopped";
+        log("收到停止请求，结束服务端进程");
+        try { p.destroy(); } catch (Throwable ignored) {}
+    }
+
+    /** 流式解压 assets 里的归档：不再把 105MB/225MB 的 tar 先复制一份到私有目录 */
+    private static void extractAsset(Context ctx, String name, File dest, TarX tarx) throws IOException {
+        log("解压 " + name + " → " + dest.getAbsolutePath());
+        tarx.extract(ctx.getAssets().open(name), dest);   // 流由 TarX 负责关闭
+    }
+
+    /**
+     * 连接令牌持久化在 persist/cli/token：解压、升级都不会动它，
+     * 于是 WebView 里已经下发的 cookie 下次启动仍然有效。
+     */
+    private static String loadOrCreateToken(File hostCli) {
+        File f = new File(hostCli, "token");
+        String t = f.exists() ? readText(f) : "";
+        if (t.length() < 32) {
+            t = newToken();
+            writeText(f, t);
+            try { android.system.Os.chmod(f.getAbsolutePath(), 0600); } catch (Throwable ignored) {}
+            log("已生成连接令牌: " + f.getAbsolutePath());
+        } else {
+            log("复用已有连接令牌: " + f.getAbsolutePath());
+        }
+        return t;
+    }
+
+    private static String newToken() {
+        byte[] b = new byte[32];
+        new SecureRandom().nextBytes(b);
+        StringBuilder sb = new StringBuilder(64);
+        for (byte x : b) {
+            sb.append(Character.forDigit((x >> 4) & 0xf, 16));
+            sb.append(Character.forDigit(x & 0xf, 16));
+        }
+        return sb.toString();
+    }
+
+    /** 服务端会把自己的带 tkn 的地址打到 stdout，这里统一打码，别让令牌流进日志文件 */
+    private static String redact(String s) {
+        if (s == null) return "";
+        String t = token;
+        if (t != null && !t.isEmpty()) s = s.replace(t, "<token>");
+        return s.replaceAll("(tkn=)[^\\s&\"']+", "$1<token>");
     }
 
     public static boolean isUp() {
@@ -311,7 +379,7 @@ public final class Boot {
             FileOutputStream out = new FileOutputStream(f);
             out.write(s.getBytes(StandardCharsets.UTF_8));
             out.close();
-        } catch (Throwable t) { log("写 stamp 失败: " + t); }
+        } catch (Throwable t) { log("写入失败 " + f.getName() + ": " + t); }
     }
 
     private static void deleteTree(File f) {

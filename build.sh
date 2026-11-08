@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 构建 VS Code Android APK（aarch64 主机上用 ARM 版 aapt2）
+# 构建 VS Code Android APK（主机可以是 aarch64 或 x86_64，aapt2/zipalign 由 fetch-assets.sh 按架构选）
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -12,8 +12,16 @@ rm -rf build/classes build/dex
 mkdir -p build/classes build/dex
 
 echo "== javac"
-javac -source 8 -target 8 -nowarn -bootclasspath "$JAR" -classpath "$JAR" \
-  -d build/classes app/src/io/dsh/vscode/*.java 2>&1 | grep -v "^Note:" || true
+# 以前这里是 `javac ... | grep -v "^Note:" || true`：编译错误连同 pipefail 一起被吞掉，
+# 一路走到 d8/aapt2 才炸，报错还极难懂。这里保留日志并显式失败。
+JAVAC_LOG=build/javac.log
+if ! javac -source 8 -target 8 -nowarn -bootclasspath "$JAR" -classpath "$JAR" \
+     -d build/classes app/src/io/dsh/vscode/*.java >"$JAVAC_LOG" 2>&1; then
+  echo "== javac 失败，输出如下：" >&2
+  cat "$JAVAC_LOG" >&2
+  exit 1
+fi
+grep -v "^Note:" "$JAVAC_LOG" || true
 
 echo "== d8"
 java -cp dl/bt/android-14/lib/d8.jar com.android.tools.r8.D8 \

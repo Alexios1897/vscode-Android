@@ -138,16 +138,34 @@ public class MainActivity extends Activity {
         // 长按状态栏显示日志
         status.setOnLongClickListener(new View.OnLongClickListener() {
             @Override public boolean onLongClick(View v) {
-                logText.setText(Boot.readLog(60000));
+                // 令牌不进日志文件；需要在外部浏览器打开时，从这里手动复制完整地址
+                logText.setText(Boot.webUrl() + "\n\n" + Boot.readLog(60000));
                 logView.setVisibility(logView.getVisibility() == View.GONE ? View.VISIBLE : View.GONE);
                 return true;
             }
         });
 
+        startServer();
+        waitForServer();
+    }
+
+    private void startServer() {
         Intent svc = new Intent(this, ServerService.class);
         if (Build.VERSION.SDK_INT >= 26) startForegroundService(svc); else startService(svc);
+    }
 
-        waitForServer();
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        // 通知栏点过「停止」之后又回到 App：重新拉起服务端
+        if ("stopped".equals(Boot.state())) {
+            loaded = false;
+            status.setVisibility(View.VISIBLE);
+            status.setText("正在重新启动 VS Code…");
+            startServer();
+            waitForServer();
+        }
     }
 
     /** 本机地址留在 WebView 内，其它统统跳系统浏览器 */
@@ -178,7 +196,7 @@ public class MainActivity extends Activity {
                             @Override public void run() {
                                 if (loaded) return;
                                 loaded = true;
-                                web.loadUrl("http://127.0.0.1:" + Boot.PORT + "/?folder=/root/workspace");
+                                web.loadUrl(Boot.webUrl());
                                 web.setVisibility(View.VISIBLE);
                                 h.postDelayed(new Runnable() {
                                     @Override public void run() { status.setVisibility(View.GONE); }

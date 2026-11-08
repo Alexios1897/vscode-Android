@@ -39,16 +39,36 @@ public final class TarX {
     }
 
     public void extract(File archive, File dest) throws IOException {
-        dest.mkdirs();
         InputStream raw = new java.io.FileInputStream(archive);
-        InputStream in = new GZIPInputStream(raw, 1 << 16);
+        try {
+            extract(raw, dest, archive.getName());
+        } finally {
+            closeQuietly(raw);
+        }
+    }
+
+    /**
+     * 直接从（assets / 网络来的）流解压，省掉"先把 105MB/225MB 的 tar 复制到私有目录"这一步。
+     * 注意：本方法会关闭传入的流。
+     */
+    public void extract(InputStream source, File dest) throws IOException {
+        extract(source, dest, "stream");
+    }
+
+    private void extract(InputStream source, File dest, String label) throws IOException {
+        dest.mkdirs();
+        InputStream in = new GZIPInputStream(source, 1 << 16);
         byte[] hdr = new byte[512];
         long files = 0, dirs = 0, links = 0;
         String pendingPath = null;
 
+        long entries = 0;
         try {
             while (readFully(in, hdr, 512) == 512) {
                 if (allZero(hdr)) break;
+                if (++entries % 2000 == 0) {
+                    log.log("[tarx] " + label + " 已处理 " + entries + " 项");
+                }
 
                 String name = str(hdr, 0, 100);
                 String prefix = str(hdr, 345, 155);
@@ -130,7 +150,7 @@ public final class TarX {
         } finally {
             try { in.close(); } catch (IOException ignored) {}
         }
-        log.log("[tarx] 完成 " + archive.getName() + ": 文件 " + files + " 目录 " + dirs + " 链接 " + links);
+        log.log("[tarx] 完成 " + label + ": 文件 " + files + " 目录 " + dirs + " 链接 " + links);
     }
 
     private void chmod(File f, int mode) {
@@ -191,6 +211,10 @@ public final class TarX {
             off += n;
         }
         return off;
+    }
+
+    private static void closeQuietly(InputStream in) {
+        try { in.close(); } catch (IOException ignored) {}
     }
 
     private static boolean allZero(byte[] b) {
