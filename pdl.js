@@ -16,6 +16,8 @@ async function headSize(u) {
   for (let i = 0; i < 5; i++) {
     try {
       const r = await fetch(u, { headers: { Range: "bytes=0-0" }, signal: AbortSignal.timeout(20000) });
+      // 出错页也带 content-length，不判状态码会把 92 字节的 HTML 当成文件
+      if (r.status >= 400) throw new Error("HTTP " + r.status);
       const cr = r.headers.get("content-range");
       if (cr && cr.includes("/")) return parseInt(cr.split("/")[1], 10);
       const cl = r.headers.get("content-length");

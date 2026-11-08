@@ -140,11 +140,6 @@ fi
 
 # ---------------------------------------------------------------- 构建工具
 log "拉取 aapt2 / zipalign 与 android.jar"
-if [ ! -x dl/sdktools/build-tools/aapt2 ]; then
-  mkdir -p dl/sdktools
-  fetch "https://github.com/lzhiyong/android-sdk-tools/releases/download/34.0.3/$SDK_TOOLS_ASSET" dl/sdktools.zip 8
-  unzip -q -o dl/sdktools.zip -d dl/sdktools
-fi
 if [ ! -f dl/platform30/android-11/android.jar ]; then
   mkdir -p dl/platform30
   fetch "https://dl.google.com/android/repository/platform-30_r03.zip" dl/platform30.zip 8
@@ -155,6 +150,23 @@ if [ ! -f dl/bt/android-14/lib/d8.jar ]; then
   fetch "https://dl.google.com/android/repository/build-tools_r34-linux.zip" dl/build-tools.zip 8
   unzip -q -o dl/build-tools.zip -d dl/bt
 fi
+
+# aapt2/zipalign：x86_64 直接用官方 build-tools 自带的，aarch64 才需要第三方静态构建
+case "$(uname -m)" in
+  x86_64|amd64)
+    log "使用官方 build-tools 自带的 aapt2 / zipalign"
+    mkdir -p dl/sdktools
+    rm -rf dl/sdktools/build-tools
+    ln -sfn ../bt/android-14 dl/sdktools/build-tools
+    ;;
+  *)
+    if [ ! -x dl/sdktools/build-tools/aapt2 ]; then
+      mkdir -p dl/sdktools
+      fetch "https://github.com/lzhiyong/android-sdk-tools/releases/download/34.0.3/$SDK_TOOLS_ASSET" dl/sdktools.zip 8
+      unzip -q -o dl/sdktools.zip -d dl/sdktools
+    fi
+    ;;
+esac
 
 chmod +x dl/sdktools/build-tools/aapt2 dl/sdktools/build-tools/zipalign app/assets/code
 log "就绪：现在可以执行 bash build.sh"
